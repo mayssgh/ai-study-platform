@@ -1,3 +1,10 @@
+<<<<<<< HEAD
+function Login() {
+  return (
+    <div>
+      <h2>Login</h2>
+    </div>
+=======
 import { useState } from "react";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";
@@ -40,10 +47,13 @@ function Login() {
       <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} />
       <button type="submit">Login</button>
     </form>
+>>>>>>> 223c3097b59af1014742816d14412459207b57e0
   );
 }
 
 export default Login;
+<<<<<<< HEAD
+=======
 localStorage.setItem("token", res.data.token);
 
 
@@ -1293,3 +1303,4 @@ localStorage.setItem("token", res.data.token);
 
 
 
+>>>>>>> 223c3097b59af1014742816d14412459207b57e0

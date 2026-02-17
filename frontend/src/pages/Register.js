@@ -1,3 +1,9 @@
+<<<<<<< HEAD
+function Register() {
+  return (
+    <div>
+      <h2>Create Account</h2>
+=======
 import { useState } from "react";
 import api from "../services/api";
 import { useNavigate } from "react-router-dom";
@@ -32,6 +38,7 @@ function Register() {
       <input placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%", padding: "10px", margin: "10px 0", borderRadius: "5px" }}/>
       <input type="password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} style={{ width: "100%", padding: "10px", margin: "10px 0", borderRadius: "5px" }}/>
       <button type="submit" onClick={handleSubmit} style={{ width: "100%", padding: "10px", backgroundColor: "#2A483A", color: "#fff", borderRadius: "5px", border: "none", cursor: "pointer" }}>Register</button>
+>>>>>>> 223c3097b59af1014742816d14412459207b57e0
     </div>
   );
 }

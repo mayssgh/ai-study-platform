@@ -1,3 +1,19 @@
+<<<<<<< HEAD
+import React from "react";
+import ReactDOM from "react-dom/client";
+import { BrowserRouter } from "react-router-dom";
+import App from "./App";
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+
+root.render(
+  <BrowserRouter>
+    <App />
+  </BrowserRouter>
+);
+
+
+=======
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import './index.css';
@@ -15,3 +31,4 @@ root.render(
 // to log results (for example: reportWebVitals(console.log))
 // or send to an analytics endpoint. Learn more: https://bit.ly/CRA-vitals
 reportWebVitals();
+>>>>>>> 223c3097b59af1014742816d14412459207b57e0
