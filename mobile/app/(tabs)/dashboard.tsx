@@ -1,15 +1,15 @@
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useRouter } from 'expo-router';
-import { signOut } from "firebase/auth";
-import { auth } from "/Users/mac/AiStudy/mobile/firebaseConfig.ts";
-import { COLORS, SPACING, RADIUS } from "/Users/mac/AiStudy/mobile/theme.ts";
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useRouter } from "expo-router";
+import { useAuth } from "@/context/AuthContext";
 
+const PRIMARY = "#9cd21f";
 
 export default function Dashboard() {
   const router = useRouter();
+  const { signOut } = useAuth();
 
   const handleLogout = async () => {
-    await signOut(auth);
+    await signOut();
     router.replace("/");
   };
 
@@ -35,34 +35,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 24,
-    backgroundColor: '#f4f6f8',
+    backgroundColor: "#f4f6f8",
   },
   title: {
     fontSize: 22,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 30,
   },
   card: {
-    backgroundColor: COLORS.card,
+    backgroundColor: PRIMARY,
     padding: 20,
-    borderRadius: RADIUS,
-    marginBottom: SPACING.medium,
+    borderRadius: 16,
+    marginBottom: 16,
     shadowColor: "#000",
     shadowOpacity: 0.08,
     shadowRadius: 5,
     elevation: 2,
   },
-  
   cardText: {
-    color: 'white',
-    fontWeight: 'bold',
+    color: "white",
+    fontWeight: "bold",
     fontSize: 18,
   },
   logout: {
-    backgroundColor: 'red',
+    backgroundColor: "red",
     padding: 15,
     borderRadius: 10,
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 40,
   },
 });

@@ -11,16 +11,13 @@ import {
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import {
-  createUserWithEmailAndPassword,
-  updateProfile,
-} from "firebase/auth";
-import { auth } from "/Users/mac/AiStudy/mobile/firebaseConfig.ts"; 
+import { useAuth } from "@/context/AuthContext";
 
 const PRIMARY = "#9cd21f";
 
 export default function Signup() {
   const router = useRouter();
+  const { signUp } = useAuth();
 
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -33,7 +30,6 @@ export default function Signup() {
       Alert.alert("Error", "Please fill all fields");
       return;
     }
-
     if (password.length < 6) {
       Alert.alert("Error", "Password must be at least 6 characters");
       return;
@@ -41,19 +37,8 @@ export default function Signup() {
 
     try {
       setLoading(true);
-
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        email,
-        password
-      );
-
-      // Save full name to Firebase user profile
-      await updateProfile(userCredential.user, {
-        displayName: fullName,
-      });
-
-      router.replace("/profile");
+      await signUp(email, password, fullName);
+      Alert.alert("Success", "Check your email to confirm your account!");
     } catch (error: any) {
       Alert.alert("Signup Failed", error.message);
     } finally {
@@ -63,7 +48,6 @@ export default function Signup() {
 
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={24} color={PRIMARY} />
@@ -72,7 +56,6 @@ export default function Signup() {
         <View style={{ width: 24 }} />
       </View>
 
-      {/* Progress Section */}
       <View style={styles.progressSection}>
         <View style={styles.progressTop}>
           <Text style={styles.questText}>Your Quest Begins!</Text>
@@ -86,11 +69,9 @@ export default function Signup() {
         </Text>
       </View>
 
-      {/* Form */}
       <View style={styles.card}>
         <Text style={styles.title}>Create Account</Text>
 
-        {/* Full Name */}
         <View style={styles.inputContainer}>
           <Ionicons name="person-outline" size={18} color="#777" />
           <TextInput
@@ -102,7 +83,6 @@ export default function Signup() {
           />
         </View>
 
-        {/* Email */}
         <View style={styles.inputContainer}>
           <Ionicons name="mail-outline" size={18} color="#777" />
           <TextInput
@@ -112,10 +92,10 @@ export default function Signup() {
             value={email}
             onChangeText={setEmail}
             autoCapitalize="none"
+            keyboardType="email-address"
           />
         </View>
 
-        {/* Password */}
         <View style={styles.inputContainer}>
           <Ionicons name="lock-closed-outline" size={18} color="#777" />
           <TextInput
@@ -139,8 +119,7 @@ export default function Signup() {
           By signing up, you agree to our Terms of Service and Privacy Policy.
         </Text>
 
-        {/* Button */}
-        <TouchableOpacity style={styles.button} onPress={handleSignup}>
+        <TouchableOpacity style={styles.button} onPress={handleSignup} disabled={loading}>
           {loading ? (
             <ActivityIndicator color="white" />
           ) : (
@@ -151,7 +130,6 @@ export default function Signup() {
           )}
         </TouchableOpacity>
 
-        {/* Login Link */}
         <View style={styles.footerRow}>
           <Text style={styles.footerText}>Already have an account?</Text>
           <TouchableOpacity onPress={() => router.push("/login")}>
@@ -169,34 +147,28 @@ const styles = StyleSheet.create({
     backgroundColor: "#f7f8f6",
     padding: 20,
   },
-
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 20,
   },
-
   headerTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: PRIMARY,
   },
-
   progressSection: {
     marginBottom: 30,
   },
-
   progressTop: {
     flexDirection: "row",
     justifyContent: "space-between",
     marginBottom: 8,
   },
-
   questText: {
     fontWeight: "600",
   },
-
   stepBadge: {
     backgroundColor: PRIMARY + "20",
     color: PRIMARY,
@@ -206,7 +178,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "bold",
   },
-
   progressBarBg: {
     height: 8,
     backgroundColor: "#e5e7eb",
@@ -214,34 +185,26 @@ const styles = StyleSheet.create({
     overflow: "hidden",
     marginBottom: 6,
   },
-
   progressBarFill: {
     width: "50%",
     height: "100%",
     backgroundColor: PRIMARY,
   },
-
   progressSub: {
     fontSize: 12,
     color: "#666",
   },
-
   card: {
     backgroundColor: "white",
     padding: 20,
     borderRadius: 16,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
     elevation: 3,
   },
-
   title: {
     fontSize: 24,
     fontWeight: "bold",
     marginBottom: 20,
   },
-
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -250,19 +213,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 15,
   },
-
   input: {
     flex: 1,
     paddingVertical: 14,
     marginLeft: 10,
   },
-
   terms: {
     fontSize: 12,
     color: "#666",
     marginBottom: 20,
   },
-
   button: {
     backgroundColor: PRIMARY,
     padding: 16,
@@ -272,23 +232,19 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-
   buttonText: {
     color: "white",
     fontWeight: "bold",
     fontSize: 16,
   },
-
   footerRow: {
     flexDirection: "row",
     justifyContent: "center",
     marginTop: 20,
   },
-
   footerText: {
     color: "#666",
   },
-
   loginText: {
     color: PRIMARY,
     fontWeight: "bold",

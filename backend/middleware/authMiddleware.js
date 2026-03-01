@@ -1,23 +1,30 @@
-const jwt = require("jsonwebtoken");
-require("dotenv").config();
+const { createClient } = require("@supabase/supabase-js");
 
-// Middleware to protect routes
-const protect = (req, res, next) => {
-  let token;
+const supabase = createClient(
+  process.env.SUPABASE_URL,
+  process.env.SUPABASE_SERVICE_ROLE_KEY
+);
 
-  // Check if header has token
-  if (req.headers.authorization && req.headers.authorization.startsWith("Bearer")) {
-    token = req.headers.authorization.split(" ")[1];
+const protect = async (req, res, next) => {
+  const authHeader = req.headers.authorization;
 
-    try {
-      const decoded = jwt.verify(token, process.env.JWT_SECRET);
-      req.user = decoded; // { id, role }
-      next();
-    } catch (error) {
-      return res.status(401).json({ message: "Not authorized, token failed" });
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ message: "No token provided" });
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const { data: { user }, error } = await supabase.auth.getUser(token);
+
+    if (error || !user) {
+      return res.status(401).json({ message: "Invalid or expired token" });
     }
-  } else {
-    return res.status(401).json({ message: "No token, authorization denied" });
+
+    req.user = user;
+    next();
+  } catch (err) {
+    res.status(401).json({ message: "Authentication failed" });
   }
 };
 
