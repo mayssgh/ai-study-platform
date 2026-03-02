@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import supabase from './config/supabaseClient.js';
 import authRoutes from "./routes/authRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/dashboard", dashboardRoutes);
 
 // Root route
 app.get("/", (req, res) => {
@@ -31,6 +33,14 @@ app.get("/test-db", async (req, res) => {
   }
 
   res.json(data);
+});
+app.get("/test-users", async (req, res) => {
+  const { data, error, count } = await supabase
+    .from("users")
+    .select("*", { count: "exact" })
+    .eq("role", "student");
+  
+  res.json({ data, error, count });
 });
 
 const PORT = process.env.PORT || 8000;
