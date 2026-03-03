@@ -60,12 +60,21 @@ export const login = async (req, res) => {
         message: error.message,
       });
     }
+    const { data: profile } = await supabase
+      .from("users")
+      .select("role, full_name")
+      .eq("id", data.user.id)
+      .single();
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
       session: data.session,
-      user: data.user,
+      user: {
+        ...data.user,
+        role: profile?.role || "student",         
+        full_name: profile?.full_name || data.user.user_metadata?.full_name || "",
+      },
     });
 
   } catch (error) {
