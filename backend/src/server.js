@@ -4,6 +4,8 @@ import dotenv from "dotenv";
 import supabase from './config/supabaseClient.js';
 import authRoutes from "./routes/authRoutes.js";
 import uploadRoutes from "./routes/uploadRoutes.js";
+import dashboardRoutes from "./routes/dashboardRoutes.js";
+import courseRoutes from "./routes/courseRoutes.js";
 
 dotenv.config();
 
@@ -16,6 +18,8 @@ app.use(express.json());
 // Routes
 app.use("/api/auth", authRoutes);
 app.use("/api/upload", uploadRoutes);
+app.use("/api/dashboard", dashboardRoutes);
+app.use("/api/courses", courseRoutes);
 
 // Root route
 app.get("/", (req, res) => {
