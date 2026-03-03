@@ -3,6 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import supabase from './config/supabaseClient.js';
 import authRoutes from "./routes/authRoutes.js";
+import uploadRoutes from "./routes/uploadRoutes.js";
 
 dotenv.config();
 
@@ -14,6 +15,7 @@ app.use(express.json());
 
 // Routes
 app.use("/api/auth", authRoutes);
+app.use("/api/upload", uploadRoutes);
 
 // Root route
 app.get("/", (req, res) => {

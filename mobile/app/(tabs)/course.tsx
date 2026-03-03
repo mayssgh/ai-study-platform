@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -6,156 +6,587 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { SafeAreaView } from "react-native-safe-area-context";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 
-export default function Course() {
+const PRIMARY = "#9cd21f";
+
+// Mock data — will be replaced with real data later
+const MOCK_COURSE = {
+  id: "1",
+  title: "Introduction to Cybersecurity",
+  subject: "Computer Science",
+  description:
+    "A complete beginner to advanced course on cybersecurity covering network security, ethical hacking, and more.",
+  total_chapters: 6,
+  completed_chapters: 2,
+  type: "ai", // "ai" or "moodle"
+  chapters: [
+    {
+      id: "c1",
+      title: "What is Cybersecurity?",
+      duration: "30 min",
+      is_completed: true,
+      order_index: 1,
+      has_quiz: true,
+      quiz_passed: true,
+      quiz_score: 90,
+    },
+    {
+      id: "c2",
+      title: "Network Fundamentals",
+      duration: "45 min",
+      is_completed: true,
+      order_index: 2,
+      has_quiz: true,
+      quiz_passed: true,
+      quiz_score: 80,
+    },
+    {
+      id: "c3",
+      title: "Types of Cyber Threats",
+      duration: "40 min",
+      is_completed: false,
+      order_index: 3,
+      has_quiz: true,
+      quiz_passed: false,
+      quiz_score: null,
+    },
+    {
+      id: "c4",
+      title: "Ethical Hacking Basics",
+      duration: "60 min",
+      is_completed: false,
+      order_index: 4,
+      has_quiz: true,
+      quiz_passed: false,
+      quiz_score: null,
+    },
+    {
+      id: "c5",
+      title: "Cryptography & Encryption",
+      duration: "50 min",
+      is_completed: false,
+      order_index: 5,
+      has_quiz: true,
+      quiz_passed: false,
+      quiz_score: null,
+    },
+    {
+      id: "c6",
+      title: "Final Project & Assessment",
+      duration: "90 min",
+      is_completed: false,
+      order_index: 6,
+      has_quiz: false,
+      quiz_passed: false,
+      quiz_score: null,
+      is_assignment: true,
+    },
+  ],
+};
+
+export default function CourseDetail() {
   const router = useRouter();
+  const [activeTab, setActiveTab] = useState<"chapters" | "quizzes" | "progress">("chapters");
+  const course = MOCK_COURSE;
+
+  const completedChapters = course.chapters.filter((c) => c.is_completed).length;
+  const progressPercent = Math.round((completedChapters / course.chapters.length) * 100);
+  const passedQuizzes = course.chapters.filter((c) => c.has_quiz && c.quiz_passed).length;
+  const totalQuizzes = course.chapters.filter((c) => c.has_quiz).length;
 
   return (
-    <ScrollView style={styles.container}>
-      
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#f7f8f6" }}>
+
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => router.back()}>
-          <Ionicons name="arrow-back" size={24} color="#333" />
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => router.back()}
+        >
+          <Ionicons name="arrow-back" size={20} color="#333" />
         </TouchableOpacity>
-
-        <Text style={styles.headerTitle}>Course Details</Text>
-        <View style={{ width: 24 }} />
+        <Text style={styles.headerTitle} numberOfLines={1}>Course Detail</Text>
+        <View style={{ width: 36 }} />
       </View>
 
-      {/* Course Info */}
-      <View style={styles.courseCard}>
-        <Text style={styles.courseTitle}>Physics: Quantum Basics</Text>
-        <Text style={styles.courseDescription}>
-          Explore the fundamentals of quantum mechanics including wave-particle
-          duality, uncertainty principle, and quantum states.
-        </Text>
+      <ScrollView style={styles.container}>
 
-        {/* Progress */}
-        <View style={styles.progressContainer}>
-          <View style={styles.progressBarBackground}>
-            <View style={styles.progressBarFill} />
+        {/* Course Hero */}
+        <View style={styles.hero}>
+          <View style={styles.heroIconBox}>
+            <Ionicons
+              name={course.type === "ai" ? "sparkles" : "school"}
+              size={36}
+              color="white"
+            />
           </View>
-          <Text style={styles.progressText}>60% Completed</Text>
+          <View style={[styles.typeBadge, { backgroundColor: course.type === "ai" ? PRIMARY + "20" : "#eff6ff" }]}>
+            <Text style={[styles.typeBadgeText, { color: course.type === "ai" ? PRIMARY : "#3b82f6" }]}>
+              {course.type === "ai" ? "AI Generated" : "Moodle Course"}
+            </Text>
+          </View>
+          <Text style={styles.courseTitle}>{course.title}</Text>
+          <Text style={styles.courseSubject}>{course.subject}</Text>
+          <Text style={styles.courseDescription}>{course.description}</Text>
         </View>
 
-        <TouchableOpacity style={styles.startButton}>
-          <Text style={styles.startButtonText}>Continue Learning</Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Modules */}
-      <View style={styles.moduleSection}>
-        <Text style={styles.sectionTitle}>Modules</Text>
-
-        {[
-          "Introduction to Quantum Theory",
-          "Wave-Particle Duality",
-          "Schrödinger Equation",
-          "Quantum Entanglement",
-        ].map((module, index) => (
-          <View key={index} style={styles.moduleCard}>
-            <Text style={styles.moduleTitle}>{module}</Text>
+        {/* Progress Card */}
+        <View style={styles.progressCard}>
+          <View style={styles.progressHeader}>
+            <Text style={styles.progressTitle}>Overall Progress</Text>
+            <Text style={styles.progressPercent}>{progressPercent}%</Text>
           </View>
-        ))}
-      </View>
-    </ScrollView>
+          <View style={styles.progressBarBg}>
+            <View style={[styles.progressBarFill, { width: `${progressPercent}%` }]} />
+          </View>
+          <View style={styles.progressStats}>
+            <View style={styles.progressStat}>
+              <MaterialIcons name="menu-book" size={18} color={PRIMARY} />
+              <Text style={styles.progressStatText}>
+                {completedChapters}/{course.chapters.length} Chapters
+              </Text>
+            </View>
+            <View style={styles.progressStat}>
+              <MaterialIcons name="quiz" size={18} color="#8b5cf6" />
+              <Text style={styles.progressStatText}>
+                {passedQuizzes}/{totalQuizzes} Quizzes Passed
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Tabs */}
+        <View style={styles.tabs}>
+          {(["chapters", "quizzes", "progress"] as const).map((tab) => (
+            <TouchableOpacity
+              key={tab}
+              style={[styles.tab, activeTab === tab && styles.tabActive]}
+              onPress={() => setActiveTab(tab)}
+            >
+              <Text style={[styles.tabText, activeTab === tab && styles.tabTextActive]}>
+                {tab.charAt(0).toUpperCase() + tab.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {/* Chapters Tab */}
+        {activeTab === "chapters" && (
+          <View style={styles.section}>
+            {course.chapters.map((chapter, index) => (
+              <View key={chapter.id}>
+                {/* Connector line */}
+                {index < course.chapters.length - 1 && (
+                  <View style={[
+                    styles.connector,
+                    { backgroundColor: chapter.is_completed ? PRIMARY : "#e5e7eb" }
+                  ]} />
+                )}
+
+                <TouchableOpacity
+                  style={[
+                    styles.chapterCard,
+                    chapter.is_completed && styles.chapterCardDone,
+                  ]}
+                >
+                  {/* Step circle */}
+                  <View style={[
+                    styles.stepCircle,
+                    chapter.is_completed
+                      ? { backgroundColor: PRIMARY }
+                      : { backgroundColor: "#e5e7eb" },
+                  ]}>
+                    {chapter.is_completed ? (
+                      <Ionicons name="checkmark" size={16} color="white" />
+                    ) : (
+                      <Text style={styles.stepNumber}>{chapter.order_index}</Text>
+                    )}
+                  </View>
+
+                  <View style={styles.chapterInfo}>
+                    <Text style={[
+                      styles.chapterTitle,
+                      !chapter.is_completed && styles.chapterTitleLocked,
+                    ]}>
+                      {chapter.title}
+                    </Text>
+                    <View style={styles.chapterMeta}>
+                      <Ionicons name="time-outline" size={12} color="#999" />
+                      <Text style={styles.chapterDuration}>{chapter.duration}</Text>
+                      {chapter.is_assignment && (
+                        <View style={styles.assignmentBadge}>
+                          <Text style={styles.assignmentBadgeText}>Assignment</Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  <View style={styles.chapterRight}>
+                    {chapter.is_completed ? (
+                      <View style={styles.doneBadge}>
+                        <Text style={styles.doneBadgeText}>Done</Text>
+                      </View>
+                    ) : (
+                      <Ionicons name="chevron-forward" size={18} color="#ccc" />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              </View>
+            ))}
+          </View>
+        )}
+
+        {/* Quizzes Tab */}
+        {activeTab === "quizzes" && (
+          <View style={styles.section}>
+            {course.chapters
+              .filter((c) => c.has_quiz)
+              .map((chapter) => (
+                <TouchableOpacity key={chapter.id} style={styles.quizCard}>
+                  <View style={[
+                    styles.quizIconBox,
+                    { backgroundColor: chapter.quiz_passed ? "#22c55e20" : chapter.is_completed ? "#ef444420" : "#f3f4f6" }
+                  ]}>
+                    <MaterialIcons
+                      name="quiz"
+                      size={24}
+                      color={chapter.quiz_passed ? "#22c55e" : chapter.is_completed ? "#ef4444" : "#ccc"}
+                    />
+                  </View>
+                  <View style={styles.quizInfo}>
+                    <Text style={styles.quizTitle}>Quiz: {chapter.title}</Text>
+                    {chapter.quiz_score !== null ? (
+                      <Text style={styles.quizScore}>Score: {chapter.quiz_score}%</Text>
+                    ) : (
+                      <Text style={styles.quizLocked}>
+                        {chapter.is_completed ? "Not attempted yet" : "Complete chapter first"}
+                      </Text>
+                    )}
+                  </View>
+                  <View style={styles.quizRight}>
+                    {chapter.quiz_passed ? (
+                      <View style={[styles.doneBadge, { backgroundColor: "#22c55e20" }]}>
+                        <Text style={[styles.doneBadgeText, { color: "#22c55e" }]}>Passed</Text>
+                      </View>
+                    ) : chapter.quiz_score !== null ? (
+                      <View style={[styles.doneBadge, { backgroundColor: "#ef444420" }]}>
+                        <Text style={[styles.doneBadgeText, { color: "#ef4444" }]}>Failed</Text>
+                      </View>
+                    ) : (
+                      <Ionicons name="lock-closed" size={18} color="#ccc" />
+                    )}
+                  </View>
+                </TouchableOpacity>
+              ))}
+          </View>
+        )}
+
+        {/* Progress Tab */}
+        {activeTab === "progress" && (
+          <View style={styles.section}>
+
+            {/* Summary cards */}
+            <View style={styles.summaryRow}>
+              <View style={[styles.summaryCard, { backgroundColor: PRIMARY + "15" }]}>
+                <Text style={[styles.summaryNumber, { color: PRIMARY }]}>{progressPercent}%</Text>
+                <Text style={styles.summaryLabel}>Completed</Text>
+              </View>
+              <View style={[styles.summaryCard, { backgroundColor: "#8b5cf615" }]}>
+                <Text style={[styles.summaryNumber, { color: "#8b5cf6" }]}>{passedQuizzes}/{totalQuizzes}</Text>
+                <Text style={styles.summaryLabel}>Quizzes Passed</Text>
+              </View>
+              <View style={[styles.summaryCard, { backgroundColor: "#f9731615" }]}>
+                <Text style={[styles.summaryNumber, { color: "#f97316" }]}>
+                  {course.chapters.filter(c => c.quiz_score !== null && c.quiz_score > 0)
+                    .reduce((acc, c) => acc + (c.quiz_score || 0), 0) /
+                    Math.max(course.chapters.filter(c => c.quiz_score !== null && c.quiz_score > 0).length, 1)
+                  }%
+                </Text>
+                <Text style={styles.summaryLabel}>Avg Score</Text>
+              </View>
+            </View>
+
+            {/* Chapter by chapter breakdown */}
+            <Text style={styles.breakdownTitle}>Chapter Breakdown</Text>
+            {course.chapters.map((chapter) => (
+              <View key={chapter.id} style={styles.breakdownCard}>
+                <View style={styles.breakdownLeft}>
+                  <View style={[
+                    styles.breakdownDot,
+                    { backgroundColor: chapter.is_completed ? PRIMARY : "#e5e7eb" }
+                  ]} />
+                  <Text style={styles.breakdownTitle2} numberOfLines={1}>
+                    {chapter.title}
+                  </Text>
+                </View>
+                <View style={styles.breakdownRight}>
+                  {chapter.is_completed ? (
+                    <Ionicons name="checkmark-circle" size={20} color={PRIMARY} />
+                  ) : (
+                    <Ionicons name="ellipse-outline" size={20} color="#ccc" />
+                  )}
+                  {chapter.has_quiz && (
+                    <View style={[
+                      styles.quizResultBadge,
+                      {
+                        backgroundColor: chapter.quiz_passed
+                          ? "#22c55e20"
+                          : chapter.quiz_score !== null
+                          ? "#ef444420"
+                          : "#f3f4f6"
+                      }
+                    ]}>
+                      <Text style={[
+                        styles.quizResultText,
+                        {
+                          color: chapter.quiz_passed
+                            ? "#22c55e"
+                            : chapter.quiz_score !== null
+                            ? "#ef4444"
+                            : "#999"
+                        }
+                      ]}>
+                        {chapter.quiz_passed
+                          ? `${chapter.quiz_score}%`
+                          : chapter.quiz_score !== null
+                          ? `${chapter.quiz_score}%`
+                          : "Quiz"}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </View>
+            ))}
+          </View>
+        )}
+
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: "#f7f8f6",
-    },
-  
-    header: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "space-between",
-      padding: 16,
-      backgroundColor: "white",
-    },
-  
-    headerTitle: {
-      fontSize: 18,
-      fontWeight: "bold",
-    },
-  
-    courseCard: {
-      backgroundColor: "white",
-      padding: 20,
-      margin: 16,
-      borderRadius: 16,
-    },
-  
-    courseTitle: {
-      fontSize: 22,
-      fontWeight: "bold",
-      marginBottom: 10,
-    },
-  
-    courseDescription: {
-      color: "#666",
-      marginBottom: 20,
-    },
-  
-    progressContainer: {
-      marginBottom: 16,
-    },
-  
-    progressBarBackground: {
-      height: 10,
-      backgroundColor: "#e5e7eb",
-      borderRadius: 20,
-    },
-  
-    progressBarFill: {
-      height: 10,
-      width: "60%",
-      backgroundColor: "#9cd21f",
-      borderRadius: 20,
-    },
-  
-    progressText: {
-      marginTop: 6,
-      fontSize: 12,
-      color: "#666",
-    },
-  
-    startButton: {
-      backgroundColor: "#9cd21f",
-      padding: 14,
-      borderRadius: 12,
-      alignItems: "center",
-    },
-  
-    startButtonText: {
-      color: "white",
-      fontWeight: "bold",
-    },
-  
-    moduleSection: {
-      paddingHorizontal: 16,
-    },
-  
-    sectionTitle: {
-      fontSize: 18,
-      fontWeight: "bold",
-      marginBottom: 12,
-    },
-  
-    moduleCard: {
-      backgroundColor: "white",
-      padding: 14,
-      borderRadius: 12,
-      marginBottom: 10,
-    },
-  
-    moduleTitle: {
-      fontWeight: "500",
-    },
-  });
-  
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    backgroundColor: "white",
+    elevation: 2,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#333",
+    flex: 1,
+    textAlign: "center",
+    marginHorizontal: 8,
+  },
+  container: { flex: 1, backgroundColor: "#f7f8f6" },
+  hero: {
+    backgroundColor: "white",
+    padding: 24,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  heroIconBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
+    backgroundColor: PRIMARY,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 12,
+  },
+  typeBadge: {
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 20,
+    marginBottom: 12,
+  },
+  typeBadgeText: { fontSize: 12, fontWeight: "bold" },
+  courseTitle: {
+    fontSize: 22,
+    fontWeight: "bold",
+    color: "#333",
+    textAlign: "center",
+    marginBottom: 4,
+  },
+  courseSubject: {
+    fontSize: 14,
+    color: "#999",
+    marginBottom: 12,
+  },
+  courseDescription: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 22,
+  },
+  progressCard: {
+    backgroundColor: "white",
+    marginHorizontal: 16,
+    marginBottom: 16,
+    borderRadius: 16,
+    padding: 16,
+    elevation: 1,
+  },
+  progressHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  progressTitle: { fontWeight: "bold", color: "#333" },
+  progressPercent: { fontWeight: "bold", color: PRIMARY, fontSize: 18 },
+  progressBarBg: {
+    height: 8,
+    backgroundColor: "#e5e7eb",
+    borderRadius: 10,
+    marginBottom: 12,
+  },
+  progressBarFill: {
+    height: 8,
+    backgroundColor: PRIMARY,
+    borderRadius: 10,
+  },
+  progressStats: { flexDirection: "row", justifyContent: "space-around" },
+  progressStat: { flexDirection: "row", alignItems: "center", gap: 6 },
+  progressStatText: { fontSize: 13, color: "#666" },
+  tabs: {
+    flexDirection: "row",
+    marginHorizontal: 16,
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 4,
+    marginBottom: 16,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: "center",
+    borderRadius: 10,
+  },
+  tabActive: { backgroundColor: PRIMARY },
+  tabText: { fontWeight: "600", color: "#999", fontSize: 14 },
+  tabTextActive: { color: "white" },
+  section: { paddingHorizontal: 16, paddingBottom: 40 },
+  connector: {
+    width: 2,
+    height: 12,
+    marginLeft: 29,
+    marginVertical: -2,
+    zIndex: 0,
+  },
+  chapterCard: {
+    backgroundColor: "white",
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+    elevation: 1,
+    zIndex: 1,
+  },
+  chapterCardDone: { borderLeftWidth: 3, borderLeftColor: PRIMARY },
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  stepNumber: { fontWeight: "bold", color: "#999", fontSize: 14 },
+  chapterInfo: { flex: 1 },
+  chapterTitle: { fontWeight: "bold", color: "#333", fontSize: 14, marginBottom: 4 },
+  chapterTitleLocked: { color: "#999" },
+  chapterMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
+  chapterDuration: { fontSize: 12, color: "#999" },
+  assignmentBadge: {
+    backgroundColor: "#f97316" + "20",
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginLeft: 4,
+  },
+  assignmentBadgeText: { fontSize: 10, color: "#f97316", fontWeight: "bold" },
+  chapterRight: { alignItems: "flex-end" },
+  doneBadge: {
+    backgroundColor: PRIMARY + "20",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+  },
+  doneBadgeText: { fontSize: 11, color: PRIMARY, fontWeight: "bold" },
+  quizCard: {
+    backgroundColor: "white",
+    borderRadius: 14,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+    elevation: 1,
+  },
+  quizIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  quizInfo: { flex: 1 },
+  quizTitle: { fontWeight: "bold", color: "#333", fontSize: 14, marginBottom: 4 },
+  quizScore: { fontSize: 12, color: "#666" },
+  quizLocked: { fontSize: 12, color: "#ccc" },
+  quizRight: { alignItems: "flex-end" },
+  summaryRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginBottom: 24,
+  },
+  summaryCard: {
+    flex: 1,
+    borderRadius: 14,
+    padding: 14,
+    alignItems: "center",
+  },
+  summaryNumber: { fontSize: 22, fontWeight: "bold", marginBottom: 4 },
+  summaryLabel: { fontSize: 11, color: "#666", textAlign: "center" },
+  breakdownTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 12,
+  },
+  breakdownCard: {
+    backgroundColor: "white",
+    borderRadius: 12,
+    padding: 14,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  breakdownLeft: { flexDirection: "row", alignItems: "center", gap: 10, flex: 1 },
+  breakdownDot: { width: 10, height: 10, borderRadius: 5 },
+  breakdownTitle2: { fontSize: 13, color: "#333", fontWeight: "500", flex: 1 },
+  breakdownRight: { flexDirection: "row", alignItems: "center", gap: 8 },
+  quizResultBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  quizResultText: { fontSize: 11, fontWeight: "bold" },
+});
