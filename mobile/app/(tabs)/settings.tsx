@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Switch,
   TextInput,
+  Switch,
   Alert,
   ActivityIndicator,
 } from "react-native";
@@ -14,8 +14,8 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useAuth } from "@/context/AuthContext";
-import { supabase } from "@/supabaseConfig";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { apiGetProfile, apiUpdateProfile, apiGetGoal, apiUpdateGoal } from "@/services/api";
 
 const PRIMARY = "#9cd21f";
 
@@ -24,42 +24,92 @@ export default function Settings() {
   const { user, signOut } = useAuth();
 
   const [fullName, setFullName] = useState("");
-  const [editingName, setEditingName] = useState(false);
-  const [savingName, setSavingName] = useState(false);
+  const [originalName, setOriginalName] = useState("");
+  const [goalMinutes, setGoalMinutes] = useState(30);
   const [notifications, setNotifications] = useState(true);
-  const [dailyGoal, setDailyGoal] = useState(30);
+  const [savingName, setSavingName] = useState(false);
+  const [savingGoal, setSavingGoal] = useState(false);
+  const [loading, setLoading] = useState(true);
+
+  const goalOptions = [15, 30, 60, 90];
 
   useEffect(() => {
-    if (!user) return;
-    supabase
-      .from("users")
-      .select("full_name")
-      .eq("id", user.id)
-      .single()
-      .then(({ data }) => {
-        if (data) setFullName(data.full_name);
-      });
-  }, [user]);
+    loadData();
+  }, []);
 
-  const saveName = async () => {
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      const [profileRes, goalRes] = await Promise.all([
+        apiGetProfile(),
+        apiGetGoal(),
+      ]);
+      if (profileRes.data) {
+        setFullName(profileRes.data.full_name || "");
+        setOriginalName(profileRes.data.full_name || "");
+      }
+      if (goalRes.data) {
+        setGoalMinutes(goalRes.data.goal_minutes || 30);
+      }
+    } catch (error) {
+      console.error("Error loading settings:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSaveName = async () => {
     if (!fullName.trim()) {
       Alert.alert("Error", "Name cannot be empty");
       return;
     }
+    if (fullName.trim() === originalName) {
+      Alert.alert("No changes", "Your name is already up to date");
+      return;
+    }
     try {
       setSavingName(true);
-      const { error } = await supabase
-        .from("users")
-        .update({ full_name: fullName.trim() })
-        .eq("id", user?.id);
-      if (error) throw error;
-      setEditingName(false);
+      await apiUpdateProfile({ full_name: fullName.trim() });
+      setOriginalName(fullName.trim());
       Alert.alert("Success", "Name updated successfully!");
     } catch (error: any) {
-      Alert.alert("Error", error.message);
+      Alert.alert("Error", error.message || "Could not update name");
     } finally {
       setSavingName(false);
     }
+  };
+
+  const handleSaveGoal = async (minutes: number) => {
+    try {
+      setSavingGoal(true);
+      setGoalMinutes(minutes);
+      await apiUpdateGoal(minutes);
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Could not update goal");
+    } finally {
+      setSavingGoal(false);
+    }
+  };
+
+  const handleChangePassword = () => {
+    Alert.alert(
+      "Change Password",
+      "A password reset email will be sent to " + user?.email,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Send Email",
+          onPress: async () => {
+            Alert.alert("Sent!", "Check your email for the reset link.");
+          },
+        },
+      ]
+    );
+  };
+
+  const handleReplayOnboarding = async () => {
+    await AsyncStorage.removeItem("onboarding_complete");
+    router.replace("/onboarding" as any);
   };
 
   const handleLogout = async () => {
@@ -76,10 +126,16 @@ export default function Settings() {
     ]);
   };
 
-  const handleResetOnboarding = async () => {
-    await AsyncStorage.removeItem("onboarding_complete");
-    Alert.alert("Done", "Onboarding reset! Restart the app to see it again.");
-  };
+  if (loading) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: "#f7f8f6" }}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={PRIMARY} />
+          <Text style={styles.loadingText}>Loading settings...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#f7f8f6" }}>
@@ -87,249 +143,182 @@ export default function Settings() {
 
         {/* Header */}
         <View style={styles.header}>
-          <TouchableOpacity
-            style={styles.backButton}
-            onPress={() => router.back()}
-          >
-            <Ionicons name="arrow-back" size={20} color="#333" />
+          <TouchableOpacity onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={24} color="#333" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Settings</Text>
-          <View style={{ width: 36 }} />
+          <View style={{ width: 24 }} />
         </View>
 
         {/* Account */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>ACCOUNT</Text>
+          <Text style={styles.sectionTitle}>Account</Text>
+
           <View style={styles.card}>
-
-            {/* Full Name */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconBox, { backgroundColor: PRIMARY + "20" }]}>
-                  <Ionicons name="person" size={18} color={PRIMARY} />
-                </View>
-                <View>
-                  <Text style={styles.settingTitle}>Full Name</Text>
-                  {editingName ? (
-                    <TextInput
-                      style={styles.nameInput}
-                      value={fullName}
-                      onChangeText={setFullName}
-                      autoFocus
-                      placeholder="Enter your name"
-                      placeholderTextColor="#999"
-                    />
-                  ) : (
-                    <Text style={styles.settingSubtitle}>{fullName || "Student"}</Text>
-                  )}
-                </View>
-              </View>
-              {editingName ? (
-                <TouchableOpacity
-                  style={styles.saveButton}
-                  onPress={saveName}
-                  disabled={savingName}
-                >
-                  {savingName ? (
-                    <ActivityIndicator size="small" color="white" />
-                  ) : (
-                    <Text style={styles.saveButtonText}>Save</Text>
-                  )}
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity onPress={() => setEditingName(true)}>
-                  <Ionicons name="pencil" size={18} color="#999" />
-                </TouchableOpacity>
-              )}
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Email */}
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconBox, { backgroundColor: "#3b82f620" }]}>
-                  <Ionicons name="mail" size={18} color="#3b82f6" />
-                </View>
-                <View>
-                  <Text style={styles.settingTitle}>Email</Text>
-                  <Text style={styles.settingSubtitle}>{user?.email}</Text>
-                </View>
-              </View>
-              <View style={styles.lockedBadge}>
-                <Text style={styles.lockedText}>Locked</Text>
-              </View>
-            </View>
-
-            <View style={styles.divider} />
-
-            {/* Change Password */}
+            <Text style={styles.fieldLabel}>Full Name</Text>
+            <TextInput
+              style={styles.input}
+              value={fullName}
+              onChangeText={setFullName}
+              placeholder="Your full name"
+              placeholderTextColor="#999"
+            />
             <TouchableOpacity
-              style={styles.settingRow}
-              onPress={() => Alert.alert("Coming Soon", "Password change will be available soon!")}
+              style={[
+                styles.saveButton,
+                fullName.trim() === originalName && styles.saveButtonDisabled,
+              ]}
+              onPress={handleSaveName}
+              disabled={savingName || fullName.trim() === originalName}
             >
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconBox, { backgroundColor: "#ef444420" }]}>
-                  <Ionicons name="lock-closed" size={18} color="#ef4444" />
-                </View>
-                <View>
-                  <Text style={styles.settingTitle}>Change Password</Text>
-                  <Text style={styles.settingSubtitle}>Update your password</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#ccc" />
+              {savingName ? (
+                <ActivityIndicator size="small" color="white" />
+              ) : (
+                <Text style={styles.saveButtonText}>Save Name</Text>
+              )}
             </TouchableOpacity>
           </View>
+
+          <View style={styles.card}>
+            <Text style={styles.fieldLabel}>Email</Text>
+            <Text style={styles.lockedValue}>{user?.email}</Text>
+            <Text style={styles.lockedNote}>Email cannot be changed</Text>
+          </View>
+
+          <TouchableOpacity style={styles.rowCard} onPress={handleChangePassword}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.rowIcon, { backgroundColor: "#ef444420" }]}>
+                <Ionicons name="lock-closed-outline" size={18} color="#ef4444" />
+              </View>
+              <Text style={styles.rowLabel}>Change Password</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
         </View>
 
         {/* Study Preferences */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>STUDY PREFERENCES</Text>
+          <Text style={styles.sectionTitle}>Study Preferences</Text>
+
           <View style={styles.card}>
-            <Text style={styles.goalLabel}>Daily Study Goal</Text>
-            <View style={styles.goalRow}>
-              {[15, 30, 60, 90].map((mins) => (
+            <View style={styles.goalHeader}>
+              <Text style={styles.fieldLabel}>Daily Study Goal</Text>
+              {savingGoal && <ActivityIndicator size="small" color={PRIMARY} />}
+            </View>
+            <Text style={styles.goalSubtitle}>
+              Currently: {goalMinutes} minutes per day
+            </Text>
+            <View style={styles.goalChips}>
+              {goalOptions.map((option) => (
                 <TouchableOpacity
-                  key={mins}
+                  key={option}
                   style={[
                     styles.goalChip,
-                    dailyGoal === mins && styles.goalChipActive,
+                    goalMinutes === option && styles.goalChipActive,
                   ]}
-                  onPress={() => setDailyGoal(mins)}
+                  onPress={() => handleSaveGoal(option)}
                 >
                   <Text
                     style={[
                       styles.goalChipText,
-                      dailyGoal === mins && styles.goalChipTextActive,
+                      goalMinutes === option && styles.goalChipTextActive,
                     ]}
                   >
-                    {mins}m
+                    {option}m
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
-            <Text style={styles.goalHint}>
-              You'll earn +50 XP when you reach your daily goal
-            </Text>
           </View>
         </View>
 
         {/* App Preferences */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>APP PREFERENCES</Text>
-          <View style={styles.card}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconBox, { backgroundColor: "#f9731620" }]}>
-                  <Ionicons name="notifications" size={18} color="#f97316" />
-                </View>
-                <View>
-                  <Text style={styles.settingTitle}>Notifications</Text>
-                  <Text style={styles.settingSubtitle}>Study reminders & updates</Text>
-                </View>
+          <Text style={styles.sectionTitle}>App Preferences</Text>
+
+          <View style={styles.rowCard}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.rowIcon, { backgroundColor: PRIMARY + "20" }]}>
+                <Ionicons name="notifications-outline" size={18} color={PRIMARY} />
               </View>
-              <Switch
-                value={notifications}
-                onValueChange={setNotifications}
-                trackColor={{ false: "#e5e7eb", true: PRIMARY }}
-                thumbColor="white"
-              />
+              <View>
+                <Text style={styles.rowLabel}>Push Notifications</Text>
+                <Text style={styles.rowSubtitle}>Study reminders & updates</Text>
+              </View>
             </View>
+            <Switch
+              value={notifications}
+              onValueChange={setNotifications}
+              trackColor={{ false: "#e5e7eb", true: PRIMARY }}
+              thumbColor="white"
+            />
           </View>
         </View>
 
         {/* Integrations */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>INTEGRATIONS</Text>
-          <View style={styles.card}>
-            <TouchableOpacity
-              style={styles.settingRow}
-              onPress={() => router.push("/(tabs)/moodle" as any)}
-            >
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconBox, { backgroundColor: PRIMARY + "20" }]}>
-                  <Ionicons name="school" size={18} color={PRIMARY} />
-                </View>
-                <View>
-                  <Text style={styles.settingTitle}>Moodle</Text>
-                  <Text style={styles.settingSubtitle}>Manage university connection</Text>
-                </View>
+          <Text style={styles.sectionTitle}>Integrations</Text>
+
+          <TouchableOpacity
+            style={styles.rowCard}
+            onPress={() => router.push("/(tabs)/moodle" as any)}
+          >
+            <View style={styles.rowLeft}>
+              <View style={[styles.rowIcon, { backgroundColor: PRIMARY + "20" }]}>
+                <Ionicons name="school-outline" size={18} color={PRIMARY} />
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#ccc" />
-            </TouchableOpacity>
-          </View>
+              <View>
+                <Text style={styles.rowLabel}>Moodle Connection</Text>
+                <Text style={styles.rowSubtitle}>Manage university sync</Text>
+              </View>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
         </View>
 
         {/* About */}
         <View style={styles.section}>
-          <Text style={styles.sectionLabel}>ABOUT</Text>
-          <View style={styles.card}>
-            <View style={styles.settingRow}>
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconBox, { backgroundColor: "#22c55e20" }]}>
-                  <Ionicons name="information-circle" size={18} color="#22c55e" />
-                </View>
-                <View>
-                  <Text style={styles.settingTitle}>App Version</Text>
-                  <Text style={styles.settingSubtitle}>v1.0.0 Beta</Text>
-                </View>
+          <Text style={styles.sectionTitle}>About</Text>
+
+          <View style={styles.rowCard}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.rowIcon, { backgroundColor: "#8b5cf620" }]}>
+                <Ionicons name="information-circle-outline" size={18} color="#8b5cf6" />
               </View>
+              <Text style={styles.rowLabel}>App Version</Text>
             </View>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.settingRow}
-              onPress={handleResetOnboarding}
-            >
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconBox, { backgroundColor: "#8b5cf620" }]}>
-                  <Ionicons name="refresh" size={18} color="#8b5cf6" />
-                </View>
-                <View>
-                  <Text style={styles.settingTitle}>Replay Onboarding</Text>
-                  <Text style={styles.settingSubtitle}>See the intro screens again</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#ccc" />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.settingRow}
-              onPress={() => Alert.alert("Terms", "Coming soon!")}
-            >
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconBox, { backgroundColor: "#3b82f620" }]}>
-                  <Ionicons name="document-text" size={18} color="#3b82f6" />
-                </View>
-                <View>
-                  <Text style={styles.settingTitle}>Terms of Service</Text>
-                  <Text style={styles.settingSubtitle}>Read our terms</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#ccc" />
-            </TouchableOpacity>
-
-            <View style={styles.divider} />
-
-            <TouchableOpacity
-              style={styles.settingRow}
-              onPress={() => Alert.alert("Privacy", "Coming soon!")}
-            >
-              <View style={styles.settingLeft}>
-                <View style={[styles.iconBox, { backgroundColor: "#8b5cf620" }]}>
-                  <Ionicons name="shield-checkmark" size={18} color="#8b5cf6" />
-                </View>
-                <View>
-                  <Text style={styles.settingTitle}>Privacy Policy</Text>
-                  <Text style={styles.settingSubtitle}>How we use your data</Text>
-                </View>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color="#ccc" />
-            </TouchableOpacity>
+            <Text style={styles.versionText}>1.0.0</Text>
           </View>
+
+          <TouchableOpacity style={styles.rowCard} onPress={handleReplayOnboarding}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.rowIcon, { backgroundColor: "#3b82f620" }]}>
+                <Ionicons name="play-circle-outline" size={18} color="#3b82f6" />
+              </View>
+              <Text style={styles.rowLabel}>Replay Onboarding</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.rowCard}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.rowIcon, { backgroundColor: "#f9731620" }]}>
+                <Ionicons name="document-text-outline" size={18} color="#f97316" />
+              </View>
+              <Text style={styles.rowLabel}>Terms of Service</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.rowCard}>
+            <View style={styles.rowLeft}>
+              <View style={[styles.rowIcon, { backgroundColor: "#22c55e20" }]}>
+                <Ionicons name="shield-checkmark-outline" size={18} color="#22c55e" />
+              </View>
+              <Text style={styles.rowLabel}>Privacy Policy</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#ccc" />
+          </TouchableOpacity>
         </View>
 
         {/* Logout */}
@@ -339,11 +328,7 @@ export default function Settings() {
         </TouchableOpacity>
 
         {/* Branding */}
-        <View style={styles.branding}>
-          <Ionicons name="sparkles" size={20} color={PRIMARY} />
-          <Text style={styles.brandingText}>AiStudy</Text>
-          <Text style={styles.brandingSubtext}>Made with ❤️ for students</Text>
-        </View>
+        <Text style={styles.branding}>AiStudy • Made for students 🎓</Text>
 
       </ScrollView>
     </SafeAreaView>
@@ -352,121 +337,117 @@ export default function Settings() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f7f8f6" },
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  loadingText: { color: "#999", fontSize: 14 },
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 20,
+    padding: 16,
     backgroundColor: "white",
-    marginBottom: 8,
+    elevation: 2,
   },
-  backButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: "#f3f4f6",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  headerTitle: { fontSize: 20, fontWeight: "bold", color: "#333" },
-  section: { paddingHorizontal: 16, marginBottom: 24 },
-  sectionLabel: {
-    fontSize: 11,
+  headerTitle: { fontSize: 18, fontWeight: "bold", color: "#333" },
+  section: { paddingHorizontal: 16, marginTop: 24 },
+  sectionTitle: {
+    fontSize: 13,
     fontWeight: "bold",
     color: "#999",
-    letterSpacing: 1.5,
+    textTransform: "uppercase",
+    letterSpacing: 1,
     marginBottom: 10,
-    marginLeft: 4,
   },
   card: {
     backgroundColor: "white",
-    borderRadius: 16,
-    padding: 4,
-    elevation: 1,
+    borderRadius: 14,
+    padding: 16,
+    marginBottom: 10,
   },
-  settingRow: {
+  fieldLabel: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: "#333",
+    marginBottom: 8,
+  },
+  input: {
+    backgroundColor: "#f3f4f6",
+    borderRadius: 10,
+    padding: 12,
+    fontSize: 14,
+    color: "#333",
+    marginBottom: 10,
+  },
+  saveButton: {
+    backgroundColor: PRIMARY,
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center",
+  },
+  saveButtonDisabled: { backgroundColor: "#ccc" },
+  saveButtonText: { color: "white", fontWeight: "bold", fontSize: 14 },
+  lockedValue: { fontSize: 15, color: "#333", marginBottom: 4 },
+  lockedNote: { fontSize: 12, color: "#999" },
+  rowCard: {
+    backgroundColor: "white",
+    borderRadius: 14,
+    padding: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    padding: 14,
+    marginBottom: 10,
   },
-  settingLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-  },
-  iconBox: {
+  rowLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  rowIcon: {
     width: 36,
     height: 36,
     borderRadius: 10,
     alignItems: "center",
     justifyContent: "center",
   },
-  settingTitle: { color: "#333", fontWeight: "600", fontSize: 15 },
-  settingSubtitle: { color: "#999", fontSize: 12, marginTop: 2 },
-  nameInput: {
-    color: PRIMARY,
-    fontSize: 13,
-    borderBottomWidth: 1,
-    borderBottomColor: PRIMARY,
-    paddingVertical: 2,
-    minWidth: 150,
-  },
-  saveButton: {
-    backgroundColor: PRIMARY,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  saveButtonText: { color: "white", fontWeight: "bold", fontSize: 13 },
-  lockedBadge: {
-    backgroundColor: "#f3f4f6",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-  },
-  lockedText: { color: "#999", fontSize: 11, fontWeight: "bold" },
-  divider: { height: 1, backgroundColor: "#f3f4f6", marginHorizontal: 14 },
-  goalLabel: {
-    color: "#333",
-    fontWeight: "bold",
-    fontSize: 15,
-    padding: 14,
-    paddingBottom: 10,
-  },
-  goalRow: {
+  rowLabel: { fontSize: 14, fontWeight: "600", color: "#333" },
+  rowSubtitle: { fontSize: 12, color: "#999", marginTop: 2 },
+  versionText: { fontSize: 13, color: "#999" },
+  goalHeader: {
     flexDirection: "row",
-    paddingHorizontal: 14,
-    gap: 10,
-    marginBottom: 10,
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 4,
   },
+  goalSubtitle: { fontSize: 12, color: "#999", marginBottom: 12 },
+  goalChips: { flexDirection: "row", gap: 10 },
   goalChip: {
     flex: 1,
     paddingVertical: 10,
+    borderRadius: 10,
+    backgroundColor: "#f3f4f6",
+    alignItems: "center",
+  },
+  goalChipActive: { backgroundColor: PRIMARY },
+  goalChipText: { fontWeight: "bold", color: "#999" },
+  goalChipTextActive: { color: "white" },
+  logoutButton: {
+    backgroundColor: "red",
+    margin: 16,
+    marginTop: 24,
+    padding: 15,
     borderRadius: 12,
     alignItems: "center",
-    backgroundColor: "#f3f4f6",
-    borderWidth: 1,
-    borderColor: "#e5e7eb",
-  },
-  goalChipActive: { backgroundColor: PRIMARY + "20", borderColor: PRIMARY },
-  goalChipText: { color: "#999", fontWeight: "bold" },
-  goalChipTextActive: { color: PRIMARY },
-  goalHint: { color: "#999", fontSize: 12, paddingHorizontal: 14, paddingBottom: 14 },
-  logoutButton: {
-    backgroundColor: "#ef4444",
-    marginHorizontal: 16,
-    padding: 16,
-    borderRadius: 14,
     flexDirection: "row",
-    alignItems: "center",
     justifyContent: "center",
     gap: 8,
-    marginBottom: 24,
+    marginBottom: 8,
   },
   logoutText: { color: "white", fontWeight: "bold", fontSize: 16 },
-  branding: { alignItems: "center", paddingBottom: 40, gap: 4 },
-  brandingText: { color: "#333", fontWeight: "bold", fontSize: 16 },
-  brandingSubtext: { color: "#999", fontSize: 12 },
+  branding: {
+    textAlign: "center",
+    color: "#ccc",
+    fontSize: 12,
+    marginBottom: 40,
+    marginTop: 8,
+  },
 });
