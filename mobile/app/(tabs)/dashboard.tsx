@@ -12,6 +12,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
 import { supabase } from "@/supabaseConfig";
+import { apiGetMyCourses } from "@/services/api";
 
 const PRIMARY = "#9cd21f";
 
@@ -76,14 +77,9 @@ export default function Dashboard() {
 
   const fetchAICourses = async () => {
     try {
-      const { data, error } = await supabase
-        .from("ai_courses")
-        .select("*")
-        .eq("user_id", user?.id)
-        .order("created_at", { ascending: false });
-
-      if (!error && data) {
-        setAiCourses(data);
+      const response = await apiGetMyCourses();
+      if (response.data) {
+        setAiCourses(response.data);
       }
     } catch (error) {
       console.error("Error fetching AI courses:", error);

@@ -16,6 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/supabaseConfig";
 import * as ImagePicker from "expo-image-picker";
 import * as FileSystem from "expo-file-system";
+import { apiGetProfile, apiLogActivity, apiGetActivity } from "@/services/api";
 
 const PRIMARY = "#9cd21f";
 
@@ -33,17 +34,22 @@ export default function Profile() {
   const { user, signOut } = useAuth();
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [activity, setActivity] = useState<any[]>([]);
 
   useEffect(() => {
     if (!user) return;
-    supabase
-      .from("users")
-      .select("full_name, xp, level, streak_days, study_hours, avatar_url")
-      .eq("id", user.id)
-      .single()
-      .then(({ data }) => {
-        if (data) setProfile(data);
-      });
+
+    apiGetProfile()
+      .then((response) => {
+        if (response.data) setProfile(response.data);
+      })
+      .catch((error) => console.error("Error fetching profile:", error));
+
+    apiGetActivity(10)
+      .then((response) => {
+        if (response.data) setActivity(response.data);
+      })
+      .catch((error) => console.error("Error fetching activity:", error));
   }, [user]);
 
   const displayName = profile?.full_name || "Student";
@@ -102,12 +108,10 @@ export default function Profile() {
       const fileName = `avatars/${user?.id}-${Date.now()}.${ext}`;
       const contentType = ext === "png" ? "image/png" : "image/jpeg";
 
-      // Read file as base64
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: "base64" as any,
       });
 
-      // Convert base64 to Uint8Array
       const binaryString = atob(base64);
       const bytes = new Uint8Array(binaryString.length);
       for (let i = 0; i < binaryString.length; i++) {
@@ -138,6 +142,7 @@ export default function Profile() {
         prev ? { ...prev, avatar_url: urlData.publicUrl } : prev
       );
 
+      await apiLogActivity("photo_updated", "Updated profile photo 📸");
       Alert.alert("Success", "Profile photo updated!");
     } catch (error: any) {
       console.error("Upload error:", error);
@@ -145,6 +150,38 @@ export default function Profile() {
     } finally {
       setUploadingPhoto(false);
     }
+  };
+
+  const getActivityIcon = (type: string) => {
+    switch (type) {
+      case "course_created": return "sparkles";
+      case "chapter_completed": return "checkmark-circle";
+      case "quiz_passed": return "trophy";
+      case "quiz_failed": return "close-circle";
+      case "goal_reached": return "flame";
+      case "photo_updated": return "camera";
+      default: return "time";
+    }
+  };
+
+  const getActivityColor = (type: string) => {
+    switch (type) {
+      case "course_created": return "#9cd21f";
+      case "chapter_completed": return "#22c55e";
+      case "quiz_passed": return "#f97316";
+      case "quiz_failed": return "#ef4444";
+      case "goal_reached": return "#f97316";
+      case "photo_updated": return "#3b82f6";
+      default: return "#8b5cf6";
+    }
+  };
+
+  const timeAgo = (dateStr: string) => {
+    const diff = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+    if (diff < 60) return `${diff}s ago`;
+    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
+    return `${Math.floor(diff / 86400)}d ago`;
   };
 
   return (
@@ -305,25 +342,27 @@ export default function Profile() {
         {/* Recent Activity */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Recent Activity</Text>
-          <TouchableOpacity
-            style={styles.linkCard}
-            onPress={() => router.push("/(tabs)/course" as any)}
-          >
-            <MaterialIcons name="science" size={24} color={PRIMARY} />
-            <View style={styles.linkText}>
-              <Text style={styles.linkTitle}>Physics: Quantum Basics</Text>
-              <Text style={styles.linkSubtitle}>Completed Quiz • 95%</Text>
+          {activity.length === 0 ? (
+            <View style={[styles.linkCard, { justifyContent: "center" }]}>
+              <Text style={{ color: "#999", fontSize: 13 }}>No activity yet</Text>
             </View>
-            <Ionicons name="chevron-forward" size={18} color="#ccc" />
-          </TouchableOpacity>
-
-          <View style={styles.linkCard}>
-            <MaterialIcons name="emoji-events" size={24} color="#f97316" />
-            <View style={styles.linkText}>
-              <Text style={styles.linkTitle}>Daily Goal Reached</Text>
-              <Text style={styles.linkSubtitle}>+50 Bonus XP</Text>
-            </View>
-          </View>
+          ) : (
+            activity.map((item) => (
+              <View key={item.id} style={styles.linkCard}>
+                <View style={[styles.linkIcon, { backgroundColor: getActivityColor(item.type) + "20" }]}>
+                  <Ionicons
+                    name={getActivityIcon(item.type) as any}
+                    size={20}
+                    color={getActivityColor(item.type)}
+                  />
+                </View>
+                <View style={styles.linkText}>
+                  <Text style={styles.linkTitle}>{item.description}</Text>
+                  <Text style={styles.linkSubtitle}>{timeAgo(item.created_at)}</Text>
+                </View>
+              </View>
+            ))
+          )}
         </View>
 
         {/* Logout */}

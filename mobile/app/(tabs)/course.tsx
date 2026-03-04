@@ -5,15 +5,41 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { apiCompleteChapter, apiSubmitQuiz, apiLogActivity } from "@/services/api";
 
 const PRIMARY = "#9cd21f";
 
-// Mock data — will be replaced with real data later
-const MOCK_COURSE = {
+interface Chapter {
+  id: string;
+  title: string;
+  duration: string;
+  is_completed: boolean;
+  order_index: number;
+  has_quiz: boolean;
+  quiz_id: string | null;
+  quiz_passed: boolean;
+  quiz_score: number | null;
+  is_assignment?: boolean;
+}
+
+interface Course {
+  id: string;
+  title: string;
+  subject: string;
+  description: string;
+  total_chapters: number;
+  completed_chapters: number;
+  type: string;
+  chapters: Chapter[];
+}
+
+const MOCK_COURSE: Course = {
   id: "1",
   title: "Introduction to Cybersecurity",
   subject: "Computer Science",
@@ -21,7 +47,7 @@ const MOCK_COURSE = {
     "A complete beginner to advanced course on cybersecurity covering network security, ethical hacking, and more.",
   total_chapters: 6,
   completed_chapters: 2,
-  type: "ai", // "ai" or "moodle"
+  type: "ai",
   chapters: [
     {
       id: "c1",
@@ -30,6 +56,7 @@ const MOCK_COURSE = {
       is_completed: true,
       order_index: 1,
       has_quiz: true,
+      quiz_id: "q1",
       quiz_passed: true,
       quiz_score: 90,
     },
@@ -40,6 +67,7 @@ const MOCK_COURSE = {
       is_completed: true,
       order_index: 2,
       has_quiz: true,
+      quiz_id: "q2",
       quiz_passed: true,
       quiz_score: 80,
     },
@@ -50,6 +78,7 @@ const MOCK_COURSE = {
       is_completed: false,
       order_index: 3,
       has_quiz: true,
+      quiz_id: "q3",
       quiz_passed: false,
       quiz_score: null,
     },
@@ -60,6 +89,7 @@ const MOCK_COURSE = {
       is_completed: false,
       order_index: 4,
       has_quiz: true,
+      quiz_id: "q4",
       quiz_passed: false,
       quiz_score: null,
     },
@@ -70,6 +100,7 @@ const MOCK_COURSE = {
       is_completed: false,
       order_index: 5,
       has_quiz: true,
+      quiz_id: "q5",
       quiz_passed: false,
       quiz_score: null,
     },
@@ -80,6 +111,7 @@ const MOCK_COURSE = {
       is_completed: false,
       order_index: 6,
       has_quiz: false,
+      quiz_id: null,
       quiz_passed: false,
       quiz_score: null,
       is_assignment: true,
@@ -87,34 +119,126 @@ const MOCK_COURSE = {
   ],
 };
 
+type TabType = "chapters" | "quizzes" | "progress";
+
 export default function CourseDetail() {
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<"chapters" | "quizzes" | "progress">("chapters");
-  const course = MOCK_COURSE;
+  const [activeTab, setActiveTab] = useState<TabType>("chapters");
+  const [course, setCourse] = useState<Course>(MOCK_COURSE);
+  const [loadingChapter, setLoadingChapter] = useState<string | null>(null);
+  const [loadingQuiz, setLoadingQuiz] = useState<string | null>(null);
 
   const completedChapters = course.chapters.filter((c) => c.is_completed).length;
   const progressPercent = Math.round((completedChapters / course.chapters.length) * 100);
   const passedQuizzes = course.chapters.filter((c) => c.has_quiz && c.quiz_passed).length;
   const totalQuizzes = course.chapters.filter((c) => c.has_quiz).length;
+  const scoredChapters = course.chapters.filter(
+    (c) => c.quiz_score !== null && c.quiz_score > 0
+  );
+  const avgScore =
+    scoredChapters.length > 0
+      ? Math.round(
+          scoredChapters.reduce((acc, c) => acc + (c.quiz_score ?? 0), 0) /
+            scoredChapters.length
+        )
+      : 0;
+
+  const handleCompleteChapter = async (chapterId: string, chapterTitle: string) => {
+    try {
+      setLoadingChapter(chapterId);
+      await apiCompleteChapter(course.id, chapterId);
+      await apiLogActivity("chapter_completed", `Completed chapter: ${chapterTitle} ✅`);
+      setCourse((prev) => ({
+        ...prev,
+        completed_chapters: prev.completed_chapters + 1,
+        chapters: prev.chapters.map((c) =>
+          c.id === chapterId ? { ...c, is_completed: true } : c
+        ),
+      }));
+      Alert.alert("Chapter Complete! 🎉", "Great job! Keep going!");
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Could not mark chapter as complete");
+    } finally {
+      setLoadingChapter(null);
+    }
+  };
+
+  const submitQuizScore = async (
+    quizId: string,
+    chapterId: string,
+    score: number
+  ) => {
+    try {
+      setLoadingQuiz(quizId);
+      await apiSubmitQuiz(course.id, quizId, score);
+      const passed = score >= 60;
+      await apiLogActivity(
+        passed ? "quiz_passed" : "quiz_failed",
+        `Quiz score: ${score}% — ${passed ? "Passed ✅" : "Failed ❌"}`
+      );
+      setCourse((prev) => ({
+        ...prev,
+        chapters: prev.chapters.map((c) =>
+          c.id === chapterId
+            ? { ...c, quiz_score: score as number | null, quiz_passed: passed }
+            : c
+        ),
+      }));
+      Alert.alert(
+        passed ? "Quiz Passed! 🎉" : "Quiz Failed 😔",
+        passed
+          ? `Score: ${score}% — You earned 50 XP!`
+          : `Score: ${score}% — You need 60% to pass. Try again!`
+      );
+    } catch (error: any) {
+      Alert.alert("Error", error.message || "Could not submit quiz");
+    } finally {
+      setLoadingQuiz(null);
+    }
+  };
+
+  const handleQuizPress = (chapter: Chapter) => {
+    if (!chapter.is_completed) {
+      Alert.alert("Locked", "Complete the chapter first to unlock the quiz.");
+      return;
+    }
+    if (!chapter.quiz_id) return;
+    const quizId = chapter.quiz_id;
+    const chapterId = chapter.id;
+    Alert.alert("Submit Quiz Score", "Choose your score", [
+      { text: "Cancel", style: "cancel" },
+      { text: "60%", onPress: () => submitQuizScore(quizId, chapterId, 60) },
+      { text: "85%", onPress: () => submitQuizScore(quizId, chapterId, 85) },
+      { text: "100%", onPress: () => submitQuizScore(quizId, chapterId, 100) },
+    ]);
+  };
+
+  const handleChapterPress = (chapter: Chapter) => {
+    if (chapter.is_completed) return;
+    Alert.alert(chapter.title, "Mark this chapter as complete?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Mark Complete ✅",
+        onPress: () => handleCompleteChapter(chapter.id, chapter.title),
+      },
+    ]);
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#f7f8f6" }}>
-
       {/* Header */}
       <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => router.back()}
-        >
+        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
           <Ionicons name="arrow-back" size={20} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle} numberOfLines={1}>Course Detail</Text>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          Course Detail
+        </Text>
         <View style={{ width: 36 }} />
       </View>
 
       <ScrollView style={styles.container}>
-
-        {/* Course Hero */}
+        {/* Hero */}
         <View style={styles.hero}>
           <View style={styles.heroIconBox}>
             <Ionicons
@@ -123,8 +247,18 @@ export default function CourseDetail() {
               color="white"
             />
           </View>
-          <View style={[styles.typeBadge, { backgroundColor: course.type === "ai" ? PRIMARY + "20" : "#eff6ff" }]}>
-            <Text style={[styles.typeBadgeText, { color: course.type === "ai" ? PRIMARY : "#3b82f6" }]}>
+          <View
+            style={[
+              styles.typeBadge,
+              { backgroundColor: course.type === "ai" ? PRIMARY + "20" : "#eff6ff" },
+            ]}
+          >
+            <Text
+              style={[
+                styles.typeBadgeText,
+                { color: course.type === "ai" ? PRIMARY : "#3b82f6" },
+              ]}
+            >
               {course.type === "ai" ? "AI Generated" : "Moodle Course"}
             </Text>
           </View>
@@ -160,7 +294,7 @@ export default function CourseDetail() {
 
         {/* Tabs */}
         <View style={styles.tabs}>
-          {(["chapters", "quizzes", "progress"] as const).map((tab) => (
+          {(["chapters", "quizzes", "progress"] as TabType[]).map((tab) => (
             <TouchableOpacity
               key={tab}
               style={[styles.tab, activeTab === tab && styles.tabActive]}
@@ -178,52 +312,54 @@ export default function CourseDetail() {
           <View style={styles.section}>
             {course.chapters.map((chapter, index) => (
               <View key={chapter.id}>
-                {/* Connector line */}
                 {index < course.chapters.length - 1 && (
-                  <View style={[
-                    styles.connector,
-                    { backgroundColor: chapter.is_completed ? PRIMARY : "#e5e7eb" }
-                  ]} />
+                  <View
+                    style={[
+                      styles.connector,
+                      { backgroundColor: chapter.is_completed ? PRIMARY : "#e5e7eb" },
+                    ]}
+                  />
                 )}
-
                 <TouchableOpacity
                   style={[
                     styles.chapterCard,
                     chapter.is_completed && styles.chapterCardDone,
                   ]}
+                  onPress={() => handleChapterPress(chapter)}
                 >
-                  {/* Step circle */}
-                  <View style={[
-                    styles.stepCircle,
-                    chapter.is_completed
-                      ? { backgroundColor: PRIMARY }
-                      : { backgroundColor: "#e5e7eb" },
-                  ]}>
-                    {chapter.is_completed ? (
+                  <View
+                    style={[
+                      styles.stepCircle,
+                      { backgroundColor: chapter.is_completed ? PRIMARY : "#e5e7eb" },
+                    ]}
+                  >
+                    {loadingChapter === chapter.id ? (
+                      <ActivityIndicator size="small" color="white" />
+                    ) : chapter.is_completed ? (
                       <Ionicons name="checkmark" size={16} color="white" />
                     ) : (
                       <Text style={styles.stepNumber}>{chapter.order_index}</Text>
                     )}
                   </View>
-
                   <View style={styles.chapterInfo}>
-                    <Text style={[
-                      styles.chapterTitle,
-                      !chapter.is_completed && styles.chapterTitleLocked,
-                    ]}>
+                    <Text
+                      style={[
+                        styles.chapterTitle,
+                        !chapter.is_completed && styles.chapterTitleLocked,
+                      ]}
+                    >
                       {chapter.title}
                     </Text>
                     <View style={styles.chapterMeta}>
                       <Ionicons name="time-outline" size={12} color="#999" />
                       <Text style={styles.chapterDuration}>{chapter.duration}</Text>
-                      {chapter.is_assignment && (
+                      {chapter.is_assignment === true && (
                         <View style={styles.assignmentBadge}>
                           <Text style={styles.assignmentBadgeText}>Assignment</Text>
                         </View>
                       )}
                     </View>
                   </View>
-
                   <View style={styles.chapterRight}>
                     {chapter.is_completed ? (
                       <View style={styles.doneBadge}>
@@ -245,16 +381,38 @@ export default function CourseDetail() {
             {course.chapters
               .filter((c) => c.has_quiz)
               .map((chapter) => (
-                <TouchableOpacity key={chapter.id} style={styles.quizCard}>
-                  <View style={[
-                    styles.quizIconBox,
-                    { backgroundColor: chapter.quiz_passed ? "#22c55e20" : chapter.is_completed ? "#ef444420" : "#f3f4f6" }
-                  ]}>
-                    <MaterialIcons
-                      name="quiz"
-                      size={24}
-                      color={chapter.quiz_passed ? "#22c55e" : chapter.is_completed ? "#ef4444" : "#ccc"}
-                    />
+                <TouchableOpacity
+                  key={chapter.id}
+                  style={styles.quizCard}
+                  onPress={() => handleQuizPress(chapter)}
+                >
+                  <View
+                    style={[
+                      styles.quizIconBox,
+                      {
+                        backgroundColor: chapter.quiz_passed
+                          ? "#22c55e20"
+                          : chapter.quiz_score !== null
+                          ? "#ef444420"
+                          : "#f3f4f6",
+                      },
+                    ]}
+                  >
+                    {loadingQuiz === chapter.quiz_id ? (
+                      <ActivityIndicator size="small" color="#999" />
+                    ) : (
+                      <MaterialIcons
+                        name="quiz"
+                        size={24}
+                        color={
+                          chapter.quiz_passed
+                            ? "#22c55e"
+                            : chapter.quiz_score !== null
+                            ? "#ef4444"
+                            : "#ccc"
+                        }
+                      />
+                    )}
                   </View>
                   <View style={styles.quizInfo}>
                     <Text style={styles.quizTitle}>Quiz: {chapter.title}</Text>
@@ -262,7 +420,7 @@ export default function CourseDetail() {
                       <Text style={styles.quizScore}>Score: {chapter.quiz_score}%</Text>
                     ) : (
                       <Text style={styles.quizLocked}>
-                        {chapter.is_completed ? "Not attempted yet" : "Complete chapter first"}
+                        {chapter.is_completed ? "Tap to attempt quiz" : "Complete chapter first"}
                       </Text>
                     )}
                   </View>
@@ -287,37 +445,33 @@ export default function CourseDetail() {
         {/* Progress Tab */}
         {activeTab === "progress" && (
           <View style={styles.section}>
-
-            {/* Summary cards */}
             <View style={styles.summaryRow}>
               <View style={[styles.summaryCard, { backgroundColor: PRIMARY + "15" }]}>
                 <Text style={[styles.summaryNumber, { color: PRIMARY }]}>{progressPercent}%</Text>
                 <Text style={styles.summaryLabel}>Completed</Text>
               </View>
               <View style={[styles.summaryCard, { backgroundColor: "#8b5cf615" }]}>
-                <Text style={[styles.summaryNumber, { color: "#8b5cf6" }]}>{passedQuizzes}/{totalQuizzes}</Text>
+                <Text style={[styles.summaryNumber, { color: "#8b5cf6" }]}>
+                  {passedQuizzes}/{totalQuizzes}
+                </Text>
                 <Text style={styles.summaryLabel}>Quizzes Passed</Text>
               </View>
               <View style={[styles.summaryCard, { backgroundColor: "#f9731615" }]}>
-                <Text style={[styles.summaryNumber, { color: "#f97316" }]}>
-                  {course.chapters.filter(c => c.quiz_score !== null && c.quiz_score > 0)
-                    .reduce((acc, c) => acc + (c.quiz_score || 0), 0) /
-                    Math.max(course.chapters.filter(c => c.quiz_score !== null && c.quiz_score > 0).length, 1)
-                  }%
-                </Text>
+                <Text style={[styles.summaryNumber, { color: "#f97316" }]}>{avgScore}%</Text>
                 <Text style={styles.summaryLabel}>Avg Score</Text>
               </View>
             </View>
 
-            {/* Chapter by chapter breakdown */}
             <Text style={styles.breakdownTitle}>Chapter Breakdown</Text>
             {course.chapters.map((chapter) => (
               <View key={chapter.id} style={styles.breakdownCard}>
                 <View style={styles.breakdownLeft}>
-                  <View style={[
-                    styles.breakdownDot,
-                    { backgroundColor: chapter.is_completed ? PRIMARY : "#e5e7eb" }
-                  ]} />
+                  <View
+                    style={[
+                      styles.breakdownDot,
+                      { backgroundColor: chapter.is_completed ? PRIMARY : "#e5e7eb" },
+                    ]}
+                  />
                   <Text style={styles.breakdownTitle2} numberOfLines={1}>
                     {chapter.title}
                   </Text>
@@ -329,31 +483,31 @@ export default function CourseDetail() {
                     <Ionicons name="ellipse-outline" size={20} color="#ccc" />
                   )}
                   {chapter.has_quiz && (
-                    <View style={[
-                      styles.quizResultBadge,
-                      {
-                        backgroundColor: chapter.quiz_passed
-                          ? "#22c55e20"
-                          : chapter.quiz_score !== null
-                          ? "#ef444420"
-                          : "#f3f4f6"
-                      }
-                    ]}>
-                      <Text style={[
-                        styles.quizResultText,
+                    <View
+                      style={[
+                        styles.quizResultBadge,
                         {
-                          color: chapter.quiz_passed
-                            ? "#22c55e"
+                          backgroundColor: chapter.quiz_passed
+                            ? "#22c55e20"
                             : chapter.quiz_score !== null
-                            ? "#ef4444"
-                            : "#999"
-                        }
-                      ]}>
-                        {chapter.quiz_passed
-                          ? `${chapter.quiz_score}%`
-                          : chapter.quiz_score !== null
-                          ? `${chapter.quiz_score}%`
-                          : "Quiz"}
+                            ? "#ef444420"
+                            : "#f3f4f6",
+                        },
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.quizResultText,
+                          {
+                            color: chapter.quiz_passed
+                              ? "#22c55e"
+                              : chapter.quiz_score !== null
+                              ? "#ef4444"
+                              : "#999",
+                          },
+                        ]}
+                      >
+                        {chapter.quiz_score !== null ? `${chapter.quiz_score}%` : "Quiz"}
                       </Text>
                     </View>
                   )}
@@ -362,7 +516,6 @@ export default function CourseDetail() {
             ))}
           </View>
         )}
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -423,11 +576,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginBottom: 4,
   },
-  courseSubject: {
-    fontSize: 14,
-    color: "#999",
-    marginBottom: 12,
-  },
+  courseSubject: { fontSize: 14, color: "#999", marginBottom: 12 },
   courseDescription: {
     fontSize: 14,
     color: "#666",
@@ -455,11 +604,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 12,
   },
-  progressBarFill: {
-    height: 8,
-    backgroundColor: PRIMARY,
-    borderRadius: 10,
-  },
+  progressBarFill: { height: 8, backgroundColor: PRIMARY, borderRadius: 10 },
   progressStats: { flexDirection: "row", justifyContent: "space-around" },
   progressStat: { flexDirection: "row", alignItems: "center", gap: 6 },
   progressStatText: { fontSize: 13, color: "#666" },
@@ -514,7 +659,7 @@ const styles = StyleSheet.create({
   chapterMeta: { flexDirection: "row", alignItems: "center", gap: 4 },
   chapterDuration: { fontSize: 12, color: "#999" },
   assignmentBadge: {
-    backgroundColor: "#f97316" + "20",
+    backgroundColor: "#f9731620",
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 8,
@@ -551,11 +696,7 @@ const styles = StyleSheet.create({
   quizScore: { fontSize: 12, color: "#666" },
   quizLocked: { fontSize: 12, color: "#ccc" },
   quizRight: { alignItems: "flex-end" },
-  summaryRow: {
-    flexDirection: "row",
-    gap: 10,
-    marginBottom: 24,
-  },
+  summaryRow: { flexDirection: "row", gap: 10, marginBottom: 24 },
   summaryCard: {
     flex: 1,
     borderRadius: 14,
@@ -583,10 +724,6 @@ const styles = StyleSheet.create({
   breakdownDot: { width: 10, height: 10, borderRadius: 5 },
   breakdownTitle2: { fontSize: 13, color: "#333", fontWeight: "500", flex: 1 },
   breakdownRight: { flexDirection: "row", alignItems: "center", gap: 8 },
-  quizResultBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 8,
-  },
+  quizResultBadge: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 },
   quizResultText: { fontSize: 11, fontWeight: "bold" },
 });
