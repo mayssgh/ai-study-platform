@@ -88,11 +88,6 @@ export default function Dashboard() {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut();
-    router.replace("/");
-  };
-
   const getProgressPercent = (course: AICourse) => {
     if (!course.total_chapters || course.total_chapters === 0) return 0;
     return Math.round((course.completed_chapters / course.total_chapters) * 100);
@@ -183,7 +178,15 @@ export default function Dashboard() {
                     <TouchableOpacity
                       key={course.id}
                       style={styles.courseCard}
-                      onPress={() => router.push("/(tabs)/course" as any)}
+                      onPress={() =>
+                        router.push({
+                          pathname: "/(tabs)/moodle-course",
+                          params: {
+                            courseId: course.id.toString(),
+                            courseName: course.fullname,
+                          },
+                        } as any)
+                      }
                     >
                       <View style={[styles.courseIconBox, { backgroundColor: "#eff6ff" }]}>
                         <Ionicons name="school" size={24} color="#3b82f6" />
@@ -204,7 +207,10 @@ export default function Dashboard() {
                               <View
                                 style={[
                                   styles.progressBarFill,
-                                  { width: `${Math.min(course.progress, 100)}%`, backgroundColor: "#3b82f6" },
+                                  {
+                                    width: `${Math.min(course.progress, 100)}%`,
+                                    backgroundColor: "#3b82f6",
+                                  },
                                 ]}
                               />
                             </View>
@@ -272,10 +278,7 @@ export default function Dashboard() {
                         <Text style={styles.courseSubtitle}>{course.subject}</Text>
                         <View style={styles.progressBarBg}>
                           <View
-                            style={[
-                              styles.progressBarFill,
-                              { width: `${percent}%` },
-                            ]}
+                            style={[styles.progressBarFill, { width: `${percent}%` }]}
                           />
                         </View>
                         <View style={styles.courseFooter}>
@@ -321,7 +324,6 @@ export default function Dashboard() {
             </View>
           </>
         )}
-
       </ScrollView>
     </SafeAreaView>
   );
@@ -393,12 +395,7 @@ const styles = StyleSheet.create({
     backgroundColor: "white",
     borderRadius: 16,
   },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#999",
-    marginTop: 12,
-  },
+  emptyText: { fontSize: 16, fontWeight: "bold", color: "#999", marginTop: 12 },
   emptySubtext: {
     color: "#bbb",
     fontSize: 13,
@@ -462,15 +459,8 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     marginBottom: 4,
   },
-  progressBarFill: {
-    height: 6,
-    backgroundColor: PRIMARY,
-    borderRadius: 10,
-  },
-  courseFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-  },
+  progressBarFill: { height: 6, backgroundColor: PRIMARY, borderRadius: 10 },
+  courseFooter: { flexDirection: "row", justifyContent: "space-between" },
   progressText: { fontSize: 11, color: "#666" },
   chaptersText: { fontSize: 11, color: "#999" },
   actionsRow: {
@@ -486,10 +476,5 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 4,
   },
-  actionLabel: {
-    marginTop: 8,
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#333",
-  },
+  actionLabel: { marginTop: 8, fontSize: 12, fontWeight: "600", color: "#333" },
 });
